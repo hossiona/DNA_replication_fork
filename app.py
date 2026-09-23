@@ -84,6 +84,7 @@ Welcome! This app challenges you to evaluate relative acid strength using the **
 * **A**tom (Size & Electronegativity) → **R**esonance → **O**rbital → **I**nduction
 """)
 
+# Initialize or re-roll the active problem pair
 if "g1" not in st.session_state or "g2" not in st.session_state:
     pair = random.sample(DATASET, 2)
     while pair[0].pka == pair[1].pka:
@@ -131,12 +132,11 @@ if st.session_state.submitted:
     else:
         st.error("❌ **Incorrect.** Review the molecular properties below to see why the stability shifted.")
 
-    st.write(f"### **Correct Answers Revealed**")
+    st.write("### **Correct Answers Revealed**")
     st.write(f"* **Stronger Acid:** {true_winner.name} (`{true_winner.formula}`)")
     st.write(f"* **Experimental Proof:** pKa of {g1.name} is **{g1.pka}** vs {g2.name} which is **{g2.pka}** (Lower pKa = Stronger Acid)")
     st.write(f"* **Dominant Rule:** {explanation}")
     
     if st.button("Next Problem ➡️"):
         st.session_state.clear()
-        st.unstore() # clear states safely
         st.rerun()
