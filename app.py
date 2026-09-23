@@ -85,78 +85,112 @@ def evaluate_primary_factor(g1, g2):
     return winner, "Other", "Subtle structural differences or solvent-stabilization variations."
 
 # --- Streamlit Web App Configuration ---
-st.set_page_config(page_title="ARIO Acidity Quiz", page_icon="🧪", layout="centered")
+st.set_page_config(page_title="ARIO Acidity Suite", page_icon="🧪", layout="centered")
 
 st.title("🧪 The ARIO Acidity Practice Suite")
-st.markdown("""
-Welcome! This app challenges you to evaluate relative acid strength using the **ARIO** hierarchy:
-* **A**tom (Size & Electronegativity) → **R**esonance → **O**rbital → **I**nduction
-""")
 
-# --- Session Initialization ---
-if "g1" not in st.session_state or "g2" not in st.session_state:
-    pair = random.sample(DATASET, 2)
-    # Check individual indices inside the pair list
-    while pair[0].pka == pair[1].pka:
+# --- App Mode Navigation Sidebar ---
+st.sidebar.header("🛠️ Application Controls")
+app_mode = st.sidebar.selectbox("Choose App Mode:", ["🎯 Practice Quiz", "🔬 Custom SMILES Sandbox"])
+
+if app_mode == "🎯 Practice Quiz":
+    st.markdown("""
+    Welcome! This app challenges you to evaluate relative acid strength using the **ARIO** hierarchy:
+    * **A**tom (Size & Electronegativity) → **R**esonance → **O**rbital → **I**nduction
+    """)
+
+    # --- Quiz Session Initialization ---
+    if "g1" not in st.session_state or "g2" not in st.session_state:
         pair = random.sample(DATASET, 2)
-    
-    st.session_state.g1 = pair[0].to_dict()
-    st.session_state.g2 = pair[1].to_dict()
-    st.session_state.submitted = False
+        while pair[0].pka == pair[1].pka:
+            pair = random.sample(DATASET, 2)
+        
+        st.session_state.g1 = pair[0].to_dict()
+        st.session_state.g2 = pair[1].to_dict()
+        st.session_state.submitted = False
 
-g1 = st.session_state.g1
-g2 = st.session_state.g2
+    g1 = st.session_state.g1
+    g2 = st.session_state.g2
 
-st.subheader("Compare the Following Pair:")
+    st.subheader("Compare the Following Pair:")
 
-# Layout Columns
-col1, col2 = st.columns(2)
-with col1:
-    st.info(f"### Option 1\n**Name:** {g1['name']}\n\n**Formula:** `{g1['formula']}`")
-    st.write(render_rdkit_svg(g1["smiles"]), unsafe_allow_html=True)
-with col2:
-    st.success(f"### Option 2\n**Name:** {g2['name']}\n\n**Formula:** `{g2['formula']}`")
-    st.write(render_rdkit_svg(g2["smiles"]), unsafe_allow_html=True)
+    col1, col2 = st.columns(2)
+    with col1:
+        st.info(f"### Option 1\n**Name:** {g1['name']}\n\n**Formula:** `{g1['formula']}`")
+        st.write(render_rdkit_svg(g1["smiles"]), unsafe_allow_html=True)
+    with col2:
+        st.success(f"### Option 2\n**Name:** {g2['name']}\n\n**Formula:** `{g2['formula']}`")
+        st.write(render_rdkit_svg(g2["smiles"]), unsafe_allow_html=True)
 
-st.markdown("---")
-
-# Input widgets
-student_choice = st.radio("1. Which molecule is the STRONGER acid?", ["Option 1", "Option 2"])
-student_factor_label = st.selectbox(
-    "2. Which ARIO factor is the dominant reason for this trend?",
-    ["A - Atom (Size or Electronegativity)", "R - Resonance", "O - Orbital Hybridization", "I - Inductive Effect"]
-)
-
-# Extract only the first character code ('A', 'R', 'O', 'I') to match logic codes
-student_factor_code = student_factor_label[0]
-
-true_winner, true_factor_code, explanation = evaluate_primary_factor(g1, g2)
-student_picked_group = g1 if student_choice == "Option 1" else g2
-
-# Submission Action
-if st.button("Submit Answer"):
-    st.session_state.submitted = True
-
-# Feedback Section
-if st.session_state.submitted:
     st.markdown("---")
-    correct_choice = (student_picked_group["name"] == true_winner["name"])
-    correct_factor = (student_factor_code == true_factor_code)
-    
-    if correct_choice and correct_factor:
-        st.balloons()
-        st.success("🎉 **Perfect!** Both your prediction and chemical reasoning are completely correct.")
-    elif correct_choice:
-        st.warning("⚠️ **Partial Credit!** You identified the stronger acid, but chose the wrong controlling mechanism.")
-    else:
-        st.error("❌ **Incorrect.** Review the molecular properties below to see why the stability shifted.")
 
-    st.write("### **Correct Answers Revealed**")
-    st.write(f"* **Stronger Acid:** {true_winner['name']} (`{true_winner['formula']}`)")
-    st.write(f"* **Experimental Proof:** pKa of {g1['name']} is **{g1['pka']}** vs {g2['name']} which is **{g2['pka']}** (Lower pKa = Stronger Acid)")
-    st.write(f"* **Dominant Rule:** {explanation}")
+    student_choice = st.radio("1. Which molecule is the STRONGER acid?", ["Option 1", "Option 2"])
+    student_factor_label = st.selectbox(
+        "2. Which ARIO factor is the dominant reason for this trend?",
+        ["A - Atom (Size or Electronegativity)", "R - Resonance", "O - Orbital Hybridization", "I - Inductive Effect"]
+    )
+
+    student_factor_code = student_factor_label[0]
+    true_winner, true_factor_code, explanation = evaluate_primary_factor(g1, g2)
+    student_picked_group = g1 if student_choice == "Option 1" else g2
+
+    if st.button("Submit Answer"):
+        st.session_state.submitted = True
+
+    if st.session_state.submitted:
+        st.markdown("---")
+        correct_choice = (student_picked_group["name"] == true_winner["name"])
+        correct_factor = (student_factor_code == true_factor_code)
+        
+        if correct_choice and correct_factor:
+            st.balloons()
+            st.success("🎉 **Perfect!** Both your prediction and chemical reasoning are completely correct.")
+        elif correct_choice:
+            st.warning("⚠️ **Partial Credit!** You identified the stronger acid, but chose the wrong controlling mechanism.")
+        else:
+            st.error("❌ **Incorrect.** Review the molecular properties below to see why the stability shifted.")
+
+        st.write("### **Correct Answers Revealed**")
+        st.write(f"* **Stronger Acid:** {true_winner['name']} (`{true_winner['formula']}`)")
+        st.write(f"* **Experimental Proof:** pKa of {g1['name']} is **{g1['pka']}** vs {g2['name']} which is **{g2['pka']}** (Lower pKa = Stronger Acid)")
+        st.write(f"* **Dominant Rule:** {explanation}")
+        
+        if st.button("Next Problem ➡️"):
+            st.session_state.clear()
+            st.rerun()
+
+else:
+    # --- Custom SMILES Sandbox Mode ---
+    st.markdown("""
+    Welcome to the **Custom SMILES Sandbox**! Type or paste valid SMILES strings below.
+    The sandbox evaluates relative stability metrics according to the ARIO algorithm rules.
+    """)
+
+    st.subheader("🔬 Build and Compare Your Custom Compounds")
+
+    col1, col2 = st.columns(2)
     
-    # Next Question Action
-    if st.button("Next Problem ➡️"):
-        st.session_state.clear()
-        st.rerun()
+    with col1:
+        st.markdown("### 🧪 Compound A")
+        name_a = st.text_input("Compound A Name", "Custom Acid A")
+        smiles_a = st.text_input("SMILES String A", "CCO") # Default Ethanol
+        pka_a = st.number_input("Experimental pKa A", value=16.0, step=0.1)
+        
+        st.markdown("**ARIO Custom Properties:**")
+        size_a = st.selectbox("Atom Size (Period Group) A", ["small", "large"], key="sa")
+        en_a = st.slider("Atom Electronegativity A", 1.0, 4.0, 3.44, step=0.01, key="en_a")
+        res_a = st.checkbox("Resonance Delocalized? A", value=False, key="res_a")
+        hyb_a = st.selectbox("Hybridization A", ["sp3", "sp2", "sp"], key="hyb_a")
+        ind_a = st.number_input("Inductive Substituents A", min_value=0, value=0, key="ind_a")
+        
+        # Verify and display live molecule drawing
+        mol_a_valid = Chem.MolFromSmiles(smiles_a) is not None
+        if mol_a_valid:
+            st.write(render_rdkit_svg(smiles_a), unsafe_allow_html=True)
+        else:
+            st.error("Invalid SMILES input syntax.")
+
+    with col2:
+        st.markdown("### 🧪 Compound B")
+        name_b = st.text_input("Compound B Name", "Custom Acid B")
+        smiles_b = st.text_input("SMILES String B", "CC(=O)O") # Default Acetic Acid
