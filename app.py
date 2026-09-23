@@ -15,7 +15,7 @@ class FunctionalGroup:
                  resonance_delocalized=False, hybridization="sp3", inductive_groups=0):
         self.name = name
         self.formula = formula
-        self.smiles = smiles  
+        self.smiles = smiles  # Added for accurate RDKit 2D structural generation
         self.pka = pka
         self.electronegativity = electronegativity
         self.size = size
@@ -23,7 +23,7 @@ class FunctionalGroup:
         self.hybridization = hybridization
         self.inductive_groups = inductive_groups
 
-# Dataset including Aromatic & Cyclic compounds
+# Expanded hardcoded dataset including advanced aromatic and cyclic compounds
 DATASET = [
     FunctionalGroup("Ethanol", "CH3CH2OH", "CCO", pka=16.0, electronegativity=3.44, size="small"),
     FunctionalGroup("Acetic Acid", "CH3COOH", "CC(=O)O", pka=4.76, electronegativity=3.44, size="small", resonance_delocalized=True),
@@ -33,6 +33,7 @@ DATASET = [
     FunctionalGroup("Acetylene", "HC#CH", "C#C", pka=25.0, electronegativity=2.55, size="small", hybridization="sp"),
     FunctionalGroup("Ethanethiol", "CH3CH2SH", "CCS", pka=10.6, electronegativity=2.58, size="large"),
     FunctionalGroup("Methylamine", "CH3NH2", "CN", pka=40.0, electronegativity=3.04, size="small"),
+    # New Aromatic & Cyclic compounds for advanced resonance checks
     FunctionalGroup("Phenol", "C6H5OH", "C1=CC=C(C=C1)O", pka=10.0, electronegativity=3.44, size="small", resonance_delocalized=True),
     FunctionalGroup("Cyclohexanol", "C6H11OH", "C1CCC(CC1)O", pka=16.0, electronegativity=3.44, size="small", resonance_delocalized=False),
     FunctionalGroup("4-Nitrophenol", "O2NC6H4OH", "C1=CC(=CC=C1[N+](=O)[O-])O", pka=7.15, electronegativity=3.44, size="small", resonance_delocalized=True, inductive_groups=1)
@@ -44,7 +45,7 @@ def render_rdkit_svg(smiles_string):
     if mol is not None:
         drawer = Draw.MolDraw2DSVG(280, 200)
         options = drawer.drawOptions()
-        options.clearBackground = False  
+        options.clearBackground = False  # Allows smooth blending with theme backgrounds
         drawer.DrawMolecule(mol)
         drawer.FinishDrawing()
         return drawer.GetDrawingText()
@@ -81,10 +82,10 @@ st.set_page_config(page_title="ARIO Acidity Quiz", page_icon="🧪", layout="cen
 st.title("🧪 The ARIO Acidity Practice Suite")
 st.markdown("""
 Welcome! This app challenges you to evaluate relative acid strength using the **ARIO** hierarchy:
-* **A**tom (Size & Electronegativity) → **R**esonance → **O**rbital → **I**nduction
+* **A**tom (Size & Electronegativity) \(\rightarrow\) **R**esonance \(\rightarrow\) **O**rbital \(\rightarrow\) **I**nduction
 """)
 
-# Initialize or re-roll the active problem pair
+# Session state initialization
 if "g1" not in st.session_state or "g2" not in st.session_state:
     pair = random.sample(DATASET, 2)
     while pair[0].pka == pair[1].pka:
@@ -123,7 +124,7 @@ if st.session_state.submitted:
     st.markdown("---")
     correct_choice = (student_picked_group == true_winner)
     correct_factor = (student_factor_code == true_factor_code)
-    
+
     if correct_choice and correct_factor:
         st.balloons()
         st.success("🎉 **Perfect!** Both your prediction and chemical reasoning are completely correct.")
@@ -132,11 +133,12 @@ if st.session_state.submitted:
     else:
         st.error("❌ **Incorrect.** Review the molecular properties below to see why the stability shifted.")
 
-    st.write("### **Correct Answers Revealed**")
+    st.write(f"### **Correct Answers Revealed**")
     st.write(f"* **Stronger Acid:** {true_winner.name} (`{true_winner.formula}`)")
     st.write(f"* **Experimental Proof:** pKa of {g1.name} is **{g1.pka}** vs {g2.name} which is **{g2.pka}** (Lower pKa = Stronger Acid)")
     st.write(f"* **Dominant Rule:** {explanation}")
-    
+
     if st.button("Next Problem ➡️"):
         st.session_state.clear()
         st.rerun()
+
