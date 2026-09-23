@@ -96,9 +96,10 @@ Welcome! This app challenges you to evaluate relative acid strength using the **
 # --- Session Initialization ---
 if "g1" not in st.session_state or "g2" not in st.session_state:
     pair = random.sample(DATASET, 2)
-    # Corrected list indexing [0] and [1]
+    # Check individual indices inside the pair list
     while pair[0].pka == pair[1].pka:
         pair = random.sample(DATASET, 2)
+    
     st.session_state.g1 = pair[0].to_dict()
     st.session_state.g2 = pair[1].to_dict()
     st.session_state.submitted = False
@@ -155,7 +156,7 @@ if st.session_state.submitted:
     st.write(f"* **Experimental Proof:** pKa of {g1['name']} is **{g1['pka']}** vs {g2['name']} which is **{g2['pka']}** (Lower pKa = Stronger Acid)")
     st.write(f"* **Dominant Rule:** {explanation}")
     
-    # Next Question Route
+    # Next Question Action
     if st.button("Next Problem ➡️"):
         st.session_state.clear()
         st.rerun()
