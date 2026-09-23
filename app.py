@@ -60,26 +60,27 @@ def evaluate_primary_factor(g1, g2):
         winner = g1 if g1['size'] == "large" else g2
         loser = g2 if winner == g1 else g1
         return winner, "A", f"**Atom Size**: {winner['name']} has a larger conjugate base atom (Period 3+), which polarizes and stabilizes negative charge much better than the smaller atom in {loser['name']}."
+    
     elif g1['electronegativity'] != g2['electronegativity']:
         winner = g1 if g1['electronegativity'] > g2['electronegativity'] else g2
         loser = g2 if winner == g1 else g1
         return winner, "A", f"**Electronegativity**: {winner['name']} has a more electronegative atom holding the acidic proton, stabilizing the resulting negative charge better."
+    
     if g1['resonance_delocalized'] != g2['resonance_delocalized']:
         winner = g1 if g1['resonance_delocalized'] else g2
         return winner, "R", f"**Resonance**: The conjugate base of {winner['name']} can delocalize its negative charge across multiple atoms through pi pathways (such as an aromatic benzene ring or carbonyl group), making it vastly more stable."
-    hybrid_order = {"sp": 3, "sp2": 2, "sp3": 1}
-    # --- Session Initialization (Replacing Flask Session Lifecycle) ---
-if "g1" not in st.session_state or "g2" not in st.session_state:
-    pair = random.sample(DATASET, 2)
-    # Check individual objects inside the sampled pair list
-    while pair[0].pka == pair[1].pka:
-        pair = random.sample(DATASET, 2)
     
-    # Convert each individual functional group object to a dictionary
-    st.session_state.g1 = pair[0].to_dict()
-    st.session_state.g2 = pair[1].to_dict()
-    st.session_state.submitted = False
-
+    hybrid_order = {"sp": 3, "sp2": 2, "sp3": 1}
+    if g1['hybridization'] != g2['hybridization']:
+        winner = g1 if hybrid_order[g1['hybridization']] > hybrid_order[g2['hybridization']] else g2
+        loser = g2 if winner == g1 else g1
+        return winner, "O", f"**Orbital Hybridization**: {winner['name']} holds electrons in an {winner['hybridization']} orbital. Higher s-character brings the negative charge closer to the nucleus, stabilizing it more than {loser['hybridization']}."
+    
+    if g1['inductive_groups'] != g2['inductive_groups']:
+        winner = g1 if g1['inductive_groups'] > g2['inductive_groups'] else g2
+        loser = g2 if winner == g1 else g1
+        return winner, "I", f"**Inductive Effect**: {winner['name']} contains highly electronegative neighboring groups or electron-withdrawing substituents (like a nitro group) that pull electron density away through sigma bonds, dispersing the negative charge."
+    
     winner = g1 if g1['pka'] < g2['pka'] else g2
     return winner, "Other", "Subtle structural differences or solvent-stabilization variations."
 
@@ -92,9 +93,10 @@ Welcome! This app challenges you to evaluate relative acid strength using the **
 * **A**tom (Size & Electronegativity) → **R**esonance → **O**rbital → **I**nduction
 """)
 
-# --- Session Initialization (Replacing Flask Session Lifecycle) ---
+# --- Session Initialization ---
 if "g1" not in st.session_state or "g2" not in st.session_state:
     pair = random.sample(DATASET, 2)
+    # Corrected list indexing [0] and [1]
     while pair[0].pka == pair[1].pka:
         pair = random.sample(DATASET, 2)
     st.session_state.g1 = pair[0].to_dict()
@@ -124,7 +126,7 @@ student_factor_label = st.selectbox(
     ["A - Atom (Size or Electronegativity)", "R - Resonance", "O - Orbital Hybridization", "I - Inductive Effect"]
 )
 
-# Extract factor code ('A', 'R', 'O', 'I') to match Flask's expected short codes
+# Extract only the first character code ('A', 'R', 'O', 'I') to match logic codes
 student_factor_code = student_factor_label[0]
 
 true_winner, true_factor_code, explanation = evaluate_primary_factor(g1, g2)
@@ -153,7 +155,7 @@ if st.session_state.submitted:
     st.write(f"* **Experimental Proof:** pKa of {g1['name']} is **{g1['pka']}** vs {g2['name']} which is **{g2['pka']}** (Lower pKa = Stronger Acid)")
     st.write(f"* **Dominant Rule:** {explanation}")
     
-    # Next Question Route Replacement
+    # Next Question Route
     if st.button("Next Problem ➡️"):
         st.session_state.clear()
         st.rerun()
