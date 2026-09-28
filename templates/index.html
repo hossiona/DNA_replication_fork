@@ -66,8 +66,8 @@
         </div>
         <div>
             <strong>Enzymatic Markers:</strong><br>
-            [H] DNA Helicase | [P] DNA Primase | [3] DNA Pol III<br>
-            [E] 3'&rarr;5' Exonuclease Proofreader | [1] DNA Pol I<br>
+            [H] DNA Helicase | [P] DNA Primase | DNA Pol III<br>
+            [E] 3'&rarr;5' Exonuclease Proofreader | DNA Pol I<br>
             [L] DNA Ligase | <span style="color:#f44747; font-weight:bold;">[⦙]</span> Unbonded Phosphodiester Nick
         </div>
     </div>
@@ -79,6 +79,8 @@ let nickIndex = 0;
 let currentFrameIndex = 0;
 let isPlaying = false;
 let timer = null;
+
+const pairChecks = {'A':'T','T':'A','C':'G','G':'C','U':'A'};
 
 async function loadSimulation() {
     const seq = document.getElementById("dna-sequence").value;
@@ -138,23 +140,24 @@ function renderFrame(idx) {
     // 2. Process Bond Layer
     let bondDisplay = frame.unzipped.map(u => u ? "." : "=").join(" ");
 
-    // 3. Process Lagging Strand
-    let laggingDisplay = "";
+    // 3. Construct Lagging Strand elements array explicitly to avoid dynamic string injection splits
+    let laggingElements = [];
     for(let i=0; i<frame.template.length; i++) {
-        if(frame.rna[i] !== " ") laggingDisplay += `<span style="color:#ce9178;">${frame.rna[i]}</span>`;
-        else if(frame.dna[i] !== " ") laggingDisplay += `<span style="color:#4ec9b0;">${frame.dna[i]}</span>`;
-        else laggingDisplay += " ";
+        // Inject structural nick notation if the bond has not been sealed by Ligase yet
+        if (i === nickIndex && frame.dna.some(b => b !== " ") && !frame.sealed_nick) {
+            laggingElements.push(`<span style="color:#f44747; font-weight:bold;">⦙</span>`);
+        } else if(frame.rna[i] !== " ") {
+            laggingElements.push(`<span style="color:#ce9178;">${frame.rna[i]}</span>`);
+        } else if(frame.dna[i] !== " ") {
+            laggingElements.push(`<span style="color:#4ec9b0;">${frame.dna[i]}</span>`);
+        } else {
+            laggingElements.push(" ");
+        }
     }
-    
-    // Structural Nick injection (⦙)
-    if (frame.dna.some(b => b !== " ") && !frame.sealed_nick) {
-        let regexArr = laggingDisplay.match(/(<span[^>]*>.*?<\/span>| )/g) || [];
-        if(regexArr[nickIndex]) { regexArr[nickIndex] = `<span style="color:#f44747; font-weight:bold;">⦙</span>`; laggingDisplay = regexArr.join(""); }
-    }
+    let laggingDisplay = laggingElements.join("");
 
     // 4. Validation Checks Row
     let validArr = [];
-    const pairChecks = {'A':'T','T':'A','C':'G','G':'C','U':'A'};
     for(let i=0; i<frame.template.length; i++) {
         let activeB = frame.rna[i] !== " " ? frame.rna[i] : frame.dna[i];
         if(activeB !== " ") {
@@ -178,4 +181,3 @@ function renderFrame(idx) {
     html += `Lagging (5'->3'):   ${laggingDisplay}\n`;
     html += `Validation Matrix:  ${validArr.join("")}\n`;
     html += `Okazaki Fragment:   ${okazakiStr}\n`;
-    html += `Enzyme Component:   ${enzArr.join("")}  <-- <span style="color:#dcdcaa;">${frame.enzyme.name}</span>\n`;
