@@ -11,7 +11,7 @@
             padding: 30px;
         }
         .container {
-            max-width: 1000px;
+            max-width: 1050px;
             margin: auto;
             background-color: #252526;
             padding: 25px;
@@ -81,7 +81,7 @@
             font-size: 16px;
             overflow-x: auto;
             border: 1px solid #333;
-            min-height: 220px;
+            min-height: 260px;
         }
         .legend {
             margin-top: 20px;
@@ -118,7 +118,8 @@
     <div class="legend">
         <strong>Visual Key:</strong><br>
         [S] SSB Protein (Protects Single Strands) | [U] Uracil (RNA Primer element)<br>
-        [P] DNA Primase | [3] DNA Polymerase III | [1] DNA Polymerase I | [L] DNA Ligase<br>
+        [1] Fragment 1 Region | [2] Fragment 2 Region | <span style="color: #a6e22e;">[✔]</span> Validated Base Pair Match<br>
+        [P] DNA Primase | DNA Polymerase III | DNA Polymerase I | [L] DNA Ligase<br>
         <span style="color: #f44747; font-weight: bold;">[⦙]</span> Structural Nick (Unbonded gap between fragments)
     </div>
 </div>
@@ -130,11 +131,11 @@ let currentFrameIndex = 0;
 let isPlaying = false;
 let animationTimer = null;
 
+const checkMatch = { 'A':'T', 'T':'A', 'C':'G', 'G':'C', 'U':'A' };
+
 async function loadNewSimulation() {
     const sequenceInput = document.getElementById("dna-sequence").value;
     document.getElementById("error-box").innerText = "";
-    
-    // Stop any running animations
     if(isPlaying) togglePlay();
 
     try {
@@ -143,7 +144,6 @@ async function loadNewSimulation() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ template: sequenceInput })
         });
-        
         const data = await response.json();
         
         if (!response.ok) {
@@ -155,7 +155,6 @@ async function loadNewSimulation() {
         nickIndex = data.nick_index;
         currentFrameIndex = 0;
         
-        // Enable interaction controls
         document.getElementById("play-btn").disabled = false;
         document.getElementById("step-back-btn").disabled = false;
         document.getElementById("step-fwd-btn").disabled = false;
@@ -182,14 +181,14 @@ function togglePlay() {
                 currentFrameIndex++;
                 renderFrame(currentFrameIndex);
             } else {
-                togglePlay(); // Auto-pause when reaching the end frame
+                togglePlay();
             }
         }, 500);
     }
 }
 
 function stepFrame(direction) {
-    if (isPlaying) togglePlay(); // Pause automation if active
+    if (isPlaying) togglePlay();
     let targetIndex = currentFrameIndex + direction;
     if (targetIndex >= 0 && targetIndex < frames.length) {
         currentFrameIndex = targetIndex;
@@ -207,7 +206,7 @@ function renderFrame(index) {
     if (!frames || frames.length === 0) return;
     const frame = frames[index];
     
-    // Build the template tracking scale
+    // Build the dynamic colorized lagging strand string
     let laggingBuild = "";
     for (let i = 0; i < frame.template.length; i++) {
         if (frame.rna[i] !== " ") {
@@ -219,7 +218,7 @@ function renderFrame(index) {
         }
     }
 
-    // Insert structural nick gap notation (⦙) at the boundary index if unligated
+    // Insert structural nick gap notation (⦙) if unligated
     if (frame.dna.some(b => b !== " ") && !frame.sealed_nick) {
         let textArr = laggingBuild.match(/(<span[^>]*>.*?<\/span>| )/g) || [];
         if(textArr[nickIndex]) {
@@ -227,6 +226,29 @@ function renderFrame(index) {
             laggingBuild = textArr.join("");
         }
     }
+
+    // Construct Okazaki Fragment Tracking Line
+    let okazakiStr = frame.okazaki.map(o => {
+        if (o === '1') return `<span style="color: #e5c07b;">1</span>`;
+        if (o === '2') return `<span style="color: #c678dd;">2</span>`;
+        return " ";
+    }).join("");
+
+    // Calculate Real-time Watson-Crick Base Pair Validation Row
+    let validationStr = [];
+    for (let i = 0; i < frame.template.length; i++) {
+        let currentLaggingBase = frame.rna[i] !== " " ? frame.rna[i] : frame.dna[i];
+        if (currentLaggingBase !== " ") {
+            if (checkMatch[currentLaggingBase] === frame.template[i]) {
+                validationStr.push(`<span style="color: #a6e22e;">✔</span>`); // Green check for valid match
+            } else {
+                validationStr.push(`<span style="color: #f44747;">✘</span>`); // Safety catch for mismatches
+            }
+        } else {
+            validationStr.push(" ");
+        }
+    }
+    let validationRow = validationStr.join("");
 
     let ssbStr = frame.ssbs.map(s => s === "S" ? `<span style="color: #b5cea8;">S</span>` : " ").join("");
 
@@ -236,9 +258,8 @@ function renderFrame(index) {
     }
     let trackingRow = enzymeStr.join("");
 
-    // Calculate dynamic separation spacing matching length boundaries
-    const spacer = "=".repeat(Math.max(65, frame.template.length + 22));
-    const subSpacer = "-".repeat(Math.max(65, frame.template.length + 22));
+    const spacer = "=".repeat(Math.max(70, frame.template.length + 22));
+    const subSpacer = "-".repeat(Math.max(70, frame.template.length + 22));
 
     let outputhtml = "";
     outputhtml += `${spacer}\n`;
@@ -247,15 +268,8 @@ function renderFrame(index) {
     outputhtml += `Template (3'->5'):  <span style="color: #569cd6;">${frame.template}</span>\n`;
     outputhtml += `SSB Proteins:       ${ssbStr}\n`;
     outputhtml += `Lagging (5'->3'):   ${laggingBuild}\n`;
+    outputhtml += `Validation Row:     ${validationRow}\n`;
+    outputhtml += `Okazaki Track:      ${okazakiStr}\n`;
     outputhtml += `Enzyme Tracker:     ${trackingRow}  <-- <span style="color: #dcdcaa;">${frame.enzyme.name}</span>\n`;
     outputhtml += `${subSpacer}\n`;
     outputhtml += `Status: <span style="color: #9cdcfe;">${frame.status}</span>\n`;
-    outputhtml += `${spacer}`;
-
-    document.getElementById("display-box").innerHTML = outputhtml;
-    document.getElementById("frame-counter").innerText = `Frame: ${index + 1} / ${frames.length}`;
-}
-</script>
-
-</body>
-</html>
