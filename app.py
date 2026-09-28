@@ -3,32 +3,30 @@
 
 # In[ ]:
 
-from flask import Flask, render_template, jsonify
+from flask import Flask, render_template, jsonify, request
+import re
 
 app = Flask(__name__)
 
-TEMPLATE = "TACGGCATTTACGCAACTGATTACAGTCATGCAT"
-LENGTH = len(TEMPLATE)
 COMPLEMENT = {'A': 'T', 'T': 'A', 'C': 'G', 'G': 'C'}
 
-def generate_simulation_frames():
+def generate_simulation_frames(template_strand):
     """
-    Simulates the entire replication pipeline and records a snapshot (frame) 
-    at each molecular alteration.
+    Simulates lagging strand replication on a custom user-defined sequence.
     """
     frames = []
+    length = len(template_strand)
     
     # State tracking structures
-    ssbs = set(range(LENGTH))
-    RNA_strand = [" "] * LENGTH
-    DNA_strand = [" "] * LENGTH
+    ssbs = set(range(length))
+    RNA_strand = [" "] * length
+    DNA_strand = [" "] * length
     sealed_nick = False
 
     def save_frame(enzyme_name, enzyme_marker, enzyme_pos, action_text):
-        # Package a deep-copy snapshot of the active molecular environment
         frames.append({
-            "template": TEMPLATE,
-            "ssbs": ["S" if i in ssbs else " " for i in range(LENGTH)],
+            "template": template_strand,
+            "ssbs": ["S" if i in ssbs else " " for i in range(length)],
             "rna": list(RNA_strand),
             "dna": list(DNA_strand),
             "sealed_nick": sealed_nick,
@@ -40,38 +38,45 @@ def generate_simulation_frames():
             "status": action_text
         })
 
-    # Frame 0: Initialization
-    save_frame("None", " ", None, "SSBs coated and stabilized single-stranded DNA.")
+    # Initial snapshot
+    save_frame("None", " ", None, "SSBs coated and stabilized the single-stranded template.")
 
+    # Calculate dynamic boundaries based on the input sequence length.
+    # Fragment 1 will take the downstream half, Fragment 2 will handle the upstream half.
+    midpoint = length // 2
+    
     fragments_plan = [
-        {"name": "Okazaki Fragment 1", "start": 33, "primer_len": 4, "limit": 20},
-        {"name": "Okazaki Fragment 2", "start": 19, "primer_len": 4, "limit": 0}
+        {"name": "Okazaki Fragment 1", "start": length - 1, "primer_len": min(4, length - midpoint), "limit": midpoint},
+        {"name": "Okazaki Fragment 2", "start": midpoint - 1, "primer_len": min(4, midpoint), "limit": 0}
     ]
 
     # --- PHASE 1: PRIMASE & POLYMERASE III LOOP ---
     for frag in fragments_plan:
+        if frag['start'] < 0 or frag['primer_len'] <= 0:
+            continue
+            
         # DNA Primase Entry
         save_frame("DNA Primase", "P", frag['start'], f"DNA Primase binding to initiate {frag['name']}...")
         
-        # Build RNA Primer
+        # Build RNA Primer (Moving right to left on the 3'->5' template)
         for i in range(frag['primer_len']):
             pos = frag['start'] - i
-            if pos in ssbs: 
-                ssbs.remove(pos)
-            base = COMPLEMENT[TEMPLATE[pos]]
+            if pos < 0: break
+            if pos in ssbs: ssbs.remove(pos)
+            base = COMPLEMENT[template_strand[pos]]
             RNA_strand[pos] = 'U' if base == 'T' else base
             save_frame("DNA Primase", "P", pos, "DNA Primase laying down RNA Primer bases (U).")
 
         # DNA Polymerase III Entry
         pol3_start = frag['start'] - frag['primer_len']
-        save_frame("DNA Polymerase III", "3", pol3_start, "DNA Polymerase III docking onto the 3' OH end of the primer.")
+        if pol3_start >= frag['limit']:
+            save_frame("DNA Polymerase III", "3", pol3_start, "DNA Polymerase III docking onto the 3' OH end of the primer.")
         
         # Elongation Phase
         curr_pos = pol3_start
         while curr_pos >= frag['limit']:
-            if curr_pos in ssbs: 
-                ssbs.remove(curr_pos)
-            DNA_strand[curr_pos] = COMPLEMENT[TEMPLATE[curr_pos]]
+            if curr_pos in ssbs: ssbs.remove(curr_pos)
+            DNA_strand[curr_pos] = COMPLEMENT[template_strand[curr_pos]]
             save_frame("DNA Polymerase III", "3", curr_pos, f"DNA Pol III extending {frag['name']} with DNA bases.")
             curr_pos -= 1
 
@@ -79,37 +84,50 @@ def generate_simulation_frames():
 
     # --- PHASE 2: DNA POLYMERASE I MATURATION ---
     for frag in fragments_plan:
+        if frag['start'] < 0: continue
         save_frame("DNA Polymerase I", "1", frag['start'], f"DNA Polymerase I targeting RNA primer on {frag['name']}.")
         
         for i in range(frag['primer_len']):
             pos = frag['start'] - i
+            if pos < 0: break
             rna_base = RNA_strand[pos]
+            if rna_base == " ": continue
             RNA_strand[pos] = " "  # Excise RNA
             DNA_strand[pos] = 'T' if rna_base == 'U' else rna_base # Replace with DNA
             save_frame("DNA Polymerase I", "1", pos, "DNA Pol I replacing RNA primer base with DNA.")
 
     # --- PHASE 3: DNA LIGASE BOND REPAIR ---
-    nick_position = 20
-    save_frame("DNA Ligase", "L", nick_position, "DNA Ligase scanning for structural nicks in the sugar-phosphate backbone...")
-    
-    sealed_nick = True
-    save_frame("DNA Ligase", "L", nick_position, "DNA Ligase catalyzes phosphodiester bond formation! Nick sealed (⦙ removed).")
+    # The nick position sits precisely at the boundary separating the fragments
+    if length > 3:
+        nick_position = midpoint
+        save_frame("DNA Ligase", "L", nick_position, "DNA Ligase scanning for structural nicks in the sugar-phosphate backbone...")
+        
+        sealed_nick = True
+        save_frame("DNA Ligase", "L", nick_position, "DNA Ligase catalyzes phosphodiester bond formation! Nick sealed (⦙ removed).")
 
     # Final wrap frame
     save_frame("None", " ", None, "Ligation complete! The lagging strand is now a single, continuous covalent molecule.")
     
-    return frames
+    return frames, midpoint
 
 @app.route('/')
 def index():
-    # Serves the main UI page
     return render_template('index.html')
 
-@app.route('/run_simulation')
+@app.route('/run_simulation', methods=['POST'])
 def run_simulation():
-    # Returns the array of states to the browser frontend asynchronously
-    simulation_data = generate_simulation_frames()
-    return jsonify(simulation_data)
+    # Read user input
+    user_input = request.json.get('template', '').upper().strip()
+    
+    # Validation check: Ensure the sequence only contains proper DNA bases
+    if not user_input or not re.match("^[ATCG]+$", user_input):
+        return jsonify({"error": "Invalid sequence. Please enter character strings containing only A, T, C, and G."}), 400
+        
+    if len(user_input) < 10 or len(user_input) > 50:
+        return jsonify({"error": "For optimal visual presentation, please input a sequence between 10 and 50 bases long."}), 400
+
+    frames, nick_idx = generate_simulation_frames(user_input)
+    return jsonify({"frames": frames, "nick_index": nick_idx})
 
 if __name__ == '__main__':
     app.run(debug=True)
