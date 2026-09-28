@@ -41,9 +41,9 @@
     </div>
 
     <div class="metrics-bar">
-        <div class="metric-card">ATP Consumed (Unzipping/Ligation) <span id="m-atp">0</span></div>
-        <div class="metric-card">GTP Consumed (Primase RNA Anchor) <span id="m-gtp">0</span></div>
-        <div class="metric-card">dNTPs Accumulated (Elongation) <span id="m-dntp">0</span></div>
+        <div class="metric-card">ATP Consumed (Helicase/Ligase) <span id="m-atp">0</span></div>
+        <div class="metric-card">GTP Consumed (Primase Anchors) <span id="m-gtp">0</span></div>
+        <div class="metric-card">dNTPs Incorporated <span id="m-dntp">0</span></div>
         <div class="metric-card">Active Status <span id="m-status" style="color:#569cd6; font-size:14px;">Idle</span></div>
     </div>
     
@@ -55,20 +55,20 @@
         <span id="frame-counter" style="color: #888; margin-left: 10px;"></span>
     </div>
 
-    <div id="display-box" class="terminal-display">Configure or retain your DNA input strand value, then hit "Load & Process Matrix".</div>
+    <div id="display-box" class="terminal-display">Configure your DNA input strand value, then hit "Load & Process Matrix".</div>
 
     <div class="legend">
         <div>
             <strong>Structural Symbols:</strong><br>
             Double Helix Bonded: <span style="color:#569cd6;">= = =</span><br>
-            Unzipped/Exposed Single Base Template: <span style="color:#888;">. . .</span><br>
-            [S] SSB Protein Insulation Coating Layer
+            Unzipped Single Base Template: <span style="color:#fff; background-color:#333; padding: 0 2px;">X</span><br>
+            [S] SSB Protein Insulation Layer
         </div>
         <div>
             <strong>Enzymatic Markers:</strong><br>
-            [H] DNA Helicase | [P] DNA Primase | DNA Pol III<br>
-            [E] 3'&rarr;5' Exonuclease Proofreader | DNA Pol I<br>
-            [L] DNA Ligase | <span style="color:#f44747; font-weight:bold;">[⦙]</span> Unbonded Phosphodiester Nick
+            [H] DNA Helicase | [P] DNA Primase | [3] DNA Pol III<br>
+            [E] Exonuclease Proofreader | [1] DNA Pol I<br>
+            [L] DNA Ligase | <span style="color:#f44747; font-weight:bold;">[⦙]</span> Sugar-Phosphate Nick
         </div>
     </div>
 </div>
@@ -130,40 +130,37 @@ function renderFrame(idx) {
     if(!frames || frames.length === 0) return;
     const frame = frames[idx];
 
-    // 1. Process Template display with unzipped/bound indicators
     let templateDisplay = "";
     for(let i=0; i<frame.template.length; i++) {
-        if(frame.unzipped[i]) templateDisplay += `<span style="color:#fff; background-color:#333;">${frame.template[i]}</span>`;
+        if(frame.unzipped[i]) templateDisplay += `<span style="color:#html; background-color:#333; font-weight:bold; padding: 0 1px;">${frame.template[i]}</span>`;
         else templateDisplay += `<span style="color:#569cd6;">${frame.template[i]}</span>`;
     }
 
-    // 2. Process Bond Layer
     let bondDisplay = frame.unzipped.map(u => u ? "." : "=").join(" ");
 
-    // 3. Construct Lagging Strand elements array explicitly to avoid dynamic string injection splits
-    let laggingElements = [];
+    // Build alignment rows strictly mapping character index matches directly
+    let laggingDisplay = "";
+    let validRow = "";
+    
     for(let i=0; i<frame.template.length; i++) {
-        // Inject structural nick notation if the bond has not been sealed by Ligase yet
+        // Render structural nicks visually without truncating surrounding indices
         if (i === nickIndex && frame.dna.some(b => b !== " ") && !frame.sealed_nick) {
-            laggingElements.push(`<span style="color:#f44747; font-weight:bold;">⦙</span>`);
+            laggingDisplay += `<span style="color:#f44747; font-weight:bold;">⦙</span>`;
         } else if(frame.rna[i] !== " ") {
-            laggingElements.push(`<span style="color:#ce9178;">${frame.rna[i]}</span>`);
+            laggingDisplay += `<span style="color:#ce9178;">${frame.rna[i]}</span>`;
         } else if(frame.dna[i] !== " ") {
-            laggingElements.push(`<span style="color:#4ec9b0;">${frame.dna[i]}</span>`);
+            laggingDisplay += `<span style="color:#4ec9b0;">${frame.dna[i]}</span>`;
         } else {
-            laggingElements.push(" ");
+            laggingDisplay += " ";
         }
-    }
-    let laggingDisplay = laggingElements.join("");
 
-    // 4. Validation Checks Row
-    let validArr = [];
-    for(let i=0; i<frame.template.length; i++) {
         let activeB = frame.rna[i] !== " " ? frame.rna[i] : frame.dna[i];
         if(activeB !== " ") {
-            if(pairChecks[activeB] === frame.template[i]) validArr.push(`<span style="color:#a6e22e;">✔</span>`);
-            else validArr.push(`<span style="color:#f44747; font-weight:bold;">✘</span>`);
-        } else { validArr.push(" "); }
+            if(pairChecks[activeB] === frame.template[i]) validRow += `<span style="color:#a6e22e;">✔</span>`;
+            else validRow += `<span style="color:#f44747; font-weight:bold;">✘</span>`;
+        } else {
+            validRow += " ";
+        }
     }
 
     let ssbStr = frame.ssbs.map(s => s === "S" ? `<span style="color:#b5cea8;">S</span>` : " ").join("");
@@ -179,5 +176,11 @@ function renderFrame(idx) {
     html += `Bonds:              ${bondDisplay}\n`;
     html += `SSB Insulation:     ${ssbStr}\n`;
     html += `Lagging (5'->3'):   ${laggingDisplay}\n`;
-    html += `Validation Matrix:  ${validArr.join("")}\n`;
-    html += `Okazaki Fragment:   ${okazakiStr}\n`;
+    html += `Validation Matrix:  ${validRow}\n`;
+    html += `Okazaki Track:      ${okazakiStr}\n`;
+    html += `Enzyme Component:   ${enzArr.join("")}  <-- <span style="color:#dcdcaa;">${frame.enzyme.name}</span>\n`;
+    html += "-".repeat(w) + `\nStatus Text: <span style="color:#9cdcfe;">${frame.status}</span>\n` + "=".repeat(w);
+
+    document.getElementById("display-box").innerHTML = html;
+    document.getElementById("frame-counter").innerText = `Step: ${idx+1} / ${frames.length}`;
+    
