@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>DNA Lagging Strand Replication Simulation</title>
+    <title>Interactive DNA Replication Dashboard</title>
     <style>
         body {
             font-family: 'Courier New', Courier, monospace;
@@ -11,7 +11,7 @@
             padding: 30px;
         }
         .container {
-            max-width: 900px;
+            max-width: 1000px;
             margin: auto;
             background-color: #252526;
             padding: 25px;
@@ -24,21 +24,54 @@
             border-bottom: 1px solid #3c3c3c;
             padding-bottom: 10px;
         }
+        .input-panel {
+            background-color: #2d2d2d;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            border-left: 4px solid #569cd6;
+        }
+        .input-panel label {
+            font-weight: bold;
+            display: block;
+            margin-bottom: 5px;
+        }
+        input[type="text"] {
+            width: 70%;
+            padding: 8px;
+            background-color: #3c3c3c;
+            color: #fff;
+            border: 1px solid #555;
+            border-radius: 4px;
+            font-family: inherit;
+            font-size: 14px;
+            text-transform: uppercase;
+        }
         .controls {
             margin: 20px 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
         button {
             font-family: inherit;
             background-color: #0e639c;
             color: white;
             border: none;
-            padding: 10px 20px;
+            padding: 10px 18px;
             cursor: pointer;
             border-radius: 4px;
             font-size: 14px;
         }
         button:hover { background-color: #1177bb; }
         button:disabled { background-color: #3c3c3c; color: #777; cursor: not-allowed; }
+        .btn-secondary { background-color: #4d4d4d; }
+        .btn-secondary:hover { background-color: #616161; }
+        .error-msg {
+            color: #f44747;
+            margin-top: 10px;
+            font-weight: bold;
+        }
         .terminal-display {
             background-color: #000;
             padding: 20px;
@@ -48,6 +81,7 @@
             font-size: 16px;
             overflow-x: auto;
             border: 1px solid #333;
+            min-height: 220px;
         }
         .legend {
             margin-top: 20px;
@@ -62,113 +96,166 @@
 <body>
 
 <div class="container">
-    <h2>Dynamic Replication Fork Animation</h2>
+    <h2>Lagging Strand Replication Engine</h2>
+    
+    <div class="input-panel">
+        <label for="dna-sequence">Enter Template Strand (3' &rarr; 5'):</label>
+        <input type="text" id="dna-sequence" value="TACGGCATTTACGCAACTGATTACAGTCATGCAT" placeholder="e.g., ATCGATCGATCG">
+        <button onclick="loadNewSimulation()">Load Sequence</button>
+        <div id="error-box" class="error-msg"></div>
+    </div>
     
     <div class="controls">
-        <button id="start-btn" onclick="startSimulation()">Run Simulation</button>
-        <span id="frame-counter" style="margin-left: 15px; color: #858585;"></span>
+        <button id="play-btn" onclick="togglePlay()" disabled>Play</button>
+        <button id="step-back-btn" class="btn-secondary" onclick="stepFrame(-1)" disabled>&larr; Step Back</button>
+        <button id="step-fwd-btn" class="btn-secondary" onclick="stepFrame(1)" disabled>Step Forward &rarr;</button>
+        <button id="reset-btn" class="btn-secondary" onclick="resetPlayback()" disabled>Restart</button>
+        <span id="frame-counter" style="color: #858585; margin-left: 10px;"></span>
     </div>
 
-    <div id="display-box" class="terminal-display">Press "Run Simulation" to stream the molecular pathway...</div>
+    <div id="display-box" class="terminal-display">Enter or verify a sequence above, then click "Load Sequence".</div>
 
     <div class="legend">
         <strong>Visual Key:</strong><br>
         [S] SSB Protein (Protects Single Strands) | [U] Uracil (RNA Primer element)<br>
         [P] DNA Primase | [3] DNA Polymerase III | [1] DNA Polymerase I | [L] DNA Ligase<br>
-        [⦙] Structural Nick (Unbonded gap between fragments)
+        <span style="color: #f44747; font-weight: bold;">[⦙]</span> Structural Nick (Unbonded gap between fragments)
     </div>
 </div>
 
 <script>
 let frames = [];
+let nickIndex = 0;
 let currentFrameIndex = 0;
+let isPlaying = false;
 let animationTimer = null;
 
-async function startSimulation() {
-    document.getElementById("start-btn").disabled = true;
-    document.getElementById("display-box").innerText = "Fetching molecular data matrix...";
+async function loadNewSimulation() {
+    const sequenceInput = document.getElementById("dna-sequence").value;
+    document.getElementById("error-box").innerText = "";
     
+    // Stop any running animations
+    if(isPlaying) togglePlay();
+
     try {
-        const response = await fetch('/run_simulation');
-        frames = await response.json();
+        const response = await fetch('/run_simulation', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ template: sequenceInput })
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+            document.getElementById("error-box").innerText = data.error;
+            return;
+        }
+        
+        frames = data.frames;
+        nickIndex = data.nick_index;
         currentFrameIndex = 0;
         
-        if(animationTimer) clearInterval(animationTimer);
-        // Controls velocity of playback (400ms interval matching original time.sleep)
-        animationTimer = setInterval(renderNextFrame, 400); 
+        // Enable interaction controls
+        document.getElementById("play-btn").disabled = false;
+        document.getElementById("step-back-btn").disabled = false;
+        document.getElementById("step-fwd-btn").disabled = false;
+        document.getElementById("reset-btn").disabled = false;
+        
+        renderFrame(currentFrameIndex);
     } catch (error) {
-        document.getElementById("display-box").innerText = "Error loading replication server matrix.";
-        document.getElementById("start-btn").disabled = false;
+        document.getElementById("error-box").innerText = "Server connection lost.";
     }
 }
 
-function renderNextFrame() {
-    if (currentFrameIndex >= frames.length) {
+function togglePlay() {
+    const playBtn = document.getElementById("play-btn");
+    if (isPlaying) {
         clearInterval(animationTimer);
-        document.getElementById("start-btn").disabled = false;
-        return;
+        playBtn.innerText = "Play";
+        isPlaying = false;
+    } else {
+        if (currentFrameIndex >= frames.length - 1) currentFrameIndex = 0; 
+        playBtn.innerText = "Pause";
+        isPlaying = true;
+        animationTimer = setInterval(() => {
+            if (currentFrameIndex < frames.length - 1) {
+                currentFrameIndex++;
+                renderFrame(currentFrameIndex);
+            } else {
+                togglePlay(); // Auto-pause when reaching the end frame
+            }
+        }, 500);
     }
+}
 
-    const frame = frames[currentFrameIndex];
+function stepFrame(direction) {
+    if (isPlaying) togglePlay(); // Pause automation if active
+    let targetIndex = currentFrameIndex + direction;
+    if (targetIndex >= 0 && targetIndex < frames.length) {
+        currentFrameIndex = targetIndex;
+        renderFrame(currentFrameIndex);
+    }
+}
+
+function resetPlayback() {
+    if (isPlaying) togglePlay();
+    currentFrameIndex = 0;
+    renderFrame(currentFrameIndex);
+}
+
+function renderFrame(index) {
+    if (!frames || frames.length === 0) return;
+    const frame = frames[index];
     
-    // Construct the synthesized lagging strand view
+    // Build the template tracking scale
     let laggingBuild = "";
     for (let i = 0; i < frame.template.length; i++) {
         if (frame.rna[i] !== " ") {
-            laggingBuild += `<span style="color: #ce9178;">${frame.rna[i]}</span>`; // Orange for RNA
+            laggingBuild += `<span style="color: #ce9178;">${frame.rna[i]}</span>`;
         } else if (frame.dna[i] !== " ") {
-            laggingBuild += `<span style="color: #4ec9b0;">${frame.dna[i]}</span>`; // Green for DNA
+            laggingBuild += `<span style="color: #4ec9b0;">${frame.dna[i]}</span>`;
         } else {
             laggingBuild += " ";
         }
     }
 
-    // Insert structural nick notation (⦙) at position 20 if it hasn't been ligated yet
-    if (frame.dna[20] !== " " && frame.dna[19] !== " " && !frame.sealed_nick) {
-        // String handling to inject the icon markup safely into index position 20
-        let parts = [...frame.rna.map((r, idx) => r !== " " ? r : frame.dna[idx])];
-        parts[20] = `<span style="color: #f44747; font-weight: bold;">⦙</span>`;
-        // Re-colorized handling for the presentation string
-        laggingBuild = parts.map((char, i) => {
-            if (i === 20 && !frame.sealed_nick) return char;
-            if (frame.rna[i] !== " ") return `<span style="color: #ce9178;">${frame.rna[i]}</span>`;
-            if (frame.dna[i] !== " ") return `<span style="color: #4ec9b0;">${frame.dna[i]}</span>`;
-            return " ";
-        }).join("");
+    // Insert structural nick gap notation (⦙) at the boundary index if unligated
+    if (frame.dna.some(b => b !== " ") && !frame.sealed_nick) {
+        let textArr = laggingBuild.match(/(<span[^>]*>.*?<\/span>| )/g) || [];
+        if(textArr[nickIndex]) {
+            textArr[nickIndex] = `<span style="color: #f44747; font-weight: bold;">⦙</span>`;
+            laggingBuild = textArr.join("");
+        }
     }
 
-    // Process SSBs
     let ssbStr = frame.ssbs.map(s => s === "S" ? `<span style="color: #b5cea8;">S</span>` : " ").join("");
 
-    // Process Active Tracker Row
     let enzymeStr = Array(frame.template.length).fill(" ");
     if (frame.enzyme.pos !== null) {
-        enzymeStr[frame.enzyme.pos] = `<span style="color: #cd907d; background-color: #3e3e3e; font-weight:bold; padding: 0 1px;">${frame.enzyme.marker}</span>`;
+        enzymeStr[frame.enzyme.pos] = `<span style="color: #ffffff; background-color: #0e639c; font-weight:bold; padding: 0 2px;">${frame.enzyme.marker}</span>`;
     }
     let trackingRow = enzymeStr.join("");
 
-    // Form complete layout
+    // Calculate dynamic separation spacing matching length boundaries
+    const spacer = "=".repeat(Math.max(65, frame.template.length + 22));
+    const subSpacer = "-".repeat(Math.max(65, frame.template.length + 22));
+
     let outputhtml = "";
-    outputhtml += "======================================================================\n";
+    outputhtml += `${spacer}\n`;
     outputhtml += "      DYNAMIC REPLICATION FORK ANIMATION (LAGGING STRAND WEB VIEW)\n";
-    outputhtml += "======================================================================\n";
+    outputhtml += `${spacer}\n`;
     outputhtml += `Template (3'->5'):  <span style="color: #569cd6;">${frame.template}</span>\n`;
     outputhtml += `SSB Proteins:       ${ssbStr}\n`;
     outputhtml += `Lagging (5'->3'):   ${laggingBuild}\n`;
     outputhtml += `Enzyme Tracker:     ${trackingRow}  <-- <span style="color: #dcdcaa;">${frame.enzyme.name}</span>\n`;
-    outputhtml += "----------------------------------------------------------------------\n";
+    outputhtml += `${subSpacer}\n`;
     outputhtml += `Status: <span style="color: #9cdcfe;">${frame.status}</span>\n`;
-    outputhtml += "======================================================================";
+    outputhtml += `${spacer}`;
 
     document.getElementById("display-box").innerHTML = outputhtml;
-    document.getElementById("frame-counter").innerText = `Frame: ${currentFrameIndex + 1} / ${frames.length}`;
-    
-    currentFrameIndex++;
+    document.getElementById("frame-counter").innerText = `Frame: ${index + 1} / ${frames.length}`;
 }
 </script>
 
 </body>
 </html>
-
-
-
