@@ -10,151 +10,104 @@ app = Flask(__name__)
 
 COMPLEMENT = {'A': 'T', 'T': 'A', 'C': 'G', 'G': 'C'}
 
-def generate_full_simulation(template_strand, trigger_mutation=True):
+def generate_simulation_frames(template_strand):
     """
-    Simulates full replication with Helicase unzipping, SSB binding, 
-    Pol III misincorporation & proofreading, Okazaki tracking, and Ligase action.
+    Simulates lagging strand replication on a custom user-defined sequence.
     """
     frames = []
     length = len(template_strand)
     
-    unzipped_mask = [False] * length  
-    ssbs = set()
+    # State tracking structures
+    ssbs = set(range(length))
     RNA_strand = [" "] * length
     DNA_strand = [" "] * length
-    okazaki_row = [" "] * length
     sealed_nick = False
-    
-    energy = {"ATP": 0, "GTP": 0, "dNTP": 0}
-    midpoint = length // 2
 
     def save_frame(enzyme_name, enzyme_marker, enzyme_pos, action_text):
         frames.append({
             "template": template_strand,
-            "unzipped": list(unzipped_mask),
             "ssbs": ["S" if i in ssbs else " " for i in range(length)],
             "rna": list(RNA_strand),
             "dna": list(DNA_strand),
-            "okazaki": list(okazaki_row),
             "sealed_nick": sealed_nick,
-            "energy": dict(energy),
-            "enzyme": {"name": enzyme_name, "marker": enzyme_marker, "pos": enzyme_pos},
+            "enzyme": {
+                "name": enzyme_name,
+                "marker": enzyme_marker,
+                "pos": enzyme_pos
+            },
             "status": action_text
         })
 
-    # --- INITIAL STATE ---
-    save_frame("None", " ", None, "Double-stranded DNA genomic duplex ready for synthesis.")
+    # Initial snapshot
+    save_frame("None", " ", None, "SSBs coated and stabilized the single-stranded template.")
+
+    # Calculate dynamic boundaries based on the input sequence length.
+    # Fragment 1 will take the downstream half, Fragment 2 will handle the upstream half.
+    midpoint = length // 2
     
-    # --- PHASE 1: HELICASE & SSB ACTIVATION (DOWNSTREAM) ---
-    for pos in range(midpoint, length):
-        unzipped_mask[pos] = True
-        ssbs.add(pos)
-        energy["ATP"] += 1  
-        save_frame("DNA Helicase", "H", pos, f"Helicase breaking hydrogen bonds at position {pos}.")
+    fragments_plan = [
+        {"name": "Okazaki Fragment 1", "start": length - 1, "primer_len": min(4, length - midpoint), "limit": midpoint},
+        {"name": "Okazaki Fragment 2", "start": midpoint - 1, "primer_len": min(4, midpoint), "limit": 0}
+    ]
 
-    # --- PHASE 2: SYNTHESIZING FRAGMENT 1 ---
-    frag1_start = length - 1
-    frag1_primer_len = min(4, length - midpoint)
-    frag1_limit = midpoint
-
-    save_frame("DNA Primase", "P", frag1_start, "DNA Primase binding to initiate Okazaki Fragment 1...")
-    for i in range(frag1_primer_len):
-        pos = frag1_start - i
-        if pos in ssbs: ssbs.remove(pos)
-        base = COMPLEMENT[template_strand[pos]]
-        RNA_strand[pos] = 'U' if base == 'T' else base
-        okazaki_row[pos] = '1'
-        energy["GTP"] += 1  
-        save_frame("DNA Primase", "P", pos, "Primase deploying RNA Primer nucleotides.")
-
-    pol3_pos = frag1_start - frag1_primer_len
-    save_frame("DNA Polymerase III", "3", pol3_pos, "DNA Polymerase III docking onto Fragment 1 primer.")
-    while pol3_pos >= frag1_limit:
-        if pol3_pos in ssbs: ssbs.remove(pol3_pos)
-        DNA_strand[pol3_pos] = COMPLEMENT[template_strand[pol3_pos]]
-        okazaki_row[pol3_pos] = '1'
-        energy["dNTP"] += 1
-        save_frame("DNA Polymerase III", "3", pol3_pos, "DNA Pol III extending Fragment 1.")
-        pol3_pos -= 1
-
-    # --- PHASE 3: HELICASE UNZIPS UPSTREAM ---
-    save_frame("None", " ", None, "Replication fork opening further. Unzipping upstream template...")
-    for pos in range(0, midpoint):
-        unzipped_mask[pos] = True
-        ssbs.add(pos)
-        energy["ATP"] += 1
-        save_frame("DNA Helicase", "H", pos, f"Helicase unzipping upstream sequence at position {pos}.")
-
-    # --- PHASE 4: SYNTHESIZING FRAGMENT 2 + PROOFREADING LOOP ---
-    frag2_start = midpoint - 1
-    frag2_primer_len = min(4, midpoint)
-    frag2_limit = 0
-
-    for i in range(frag2_primer_len):
-        pos = frag2_start - i
-        if pos in ssbs: ssbs.remove(pos)
-        base = COMPLEMENT[template_strand[pos]]
-        RNA_strand[pos] = 'U' if base == 'T' else base
-        okazaki_row[pos] = '2'
-        energy["GTP"] += 1
-        save_frame("DNA Primase", "P", pos, "Primase laying down RNA primer for Fragment 2.")
-
-    pol3_pos = frag2_start - frag2_primer_len
-    
-    # Calculate mutation spot correctly without internal variable reference crashes
-    mutation_spot = frag2_limit + (pol3_pos - frag2_limit) // 2 if (pol3_pos - frag2_limit) > 1 else -1
-    
-    while pol3_pos >= frag2_limit:
-        if pol3_pos in ssbs: ssbs.remove(pol3_pos)
+    # --- PHASE 1: PRIMASE & POLYMERASE III LOOP ---
+    for frag in fragments_plan:
+        if frag['start'] < 0 or frag['primer_len'] <= 0:
+            continue
+            
+        # DNA Primase Entry
+        save_frame("DNA Primase", "P", frag['start'], f"DNA Primase binding to initiate {frag['name']}...")
         
-        if trigger_mutation and pol3_pos == mutation_spot:
-            correct_base = COMPLEMENT[template_strand[pol3_pos]]
-            wrong_base = 'A' if correct_base != 'A' else 'C'
-            
-            DNA_strand[pol3_pos] = wrong_base
-            okazaki_row[pol3_pos] = '2'
-            energy["dNTP"] += 1
-            save_frame("DNA Polymerase III", "3", pol3_pos, "⚠️ WARNING: DNA Pol III structural slip! Mismatched base incorporated.")
-            
-            save_frame("DNA Polymerase III (Exonuclease)", "E", pol3_pos, "❌ Mismatch caught by structural check! Activating 3'→5' Exonuclease...")
-            
-            DNA_strand[pol3_pos] = " "
-            okazaki_row[pol3_pos] = " "
-            save_frame("DNA Polymerase III (Exonuclease)", "E", pol3_pos, "Exonuclease excised the erroneous nucleotide base.")
-            
-            DNA_strand[pol3_pos] = correct_base
-            okazaki_row[pol3_pos] = '2'
-            energy["dNTP"] += 1
-            save_frame("DNA Polymerase III", "3", pol3_pos, "Pol III re-synthesized the position properly via high-fidelity match.")
-        else:
-            DNA_strand[pol3_pos] = COMPLEMENT[template_strand[pol3_pos]]
-            okazaki_row[pol3_pos] = '2'
-            energy["dNTP"] += 1
-            save_frame("DNA Polymerase III", "3", pol3_pos, "DNA Pol III extending Fragment 2.")
-            
-        pol3_pos -= 1
+        # Build RNA Primer (Moving right to left on the 3'->5' template)
+        for i in range(frag['primer_len']):
+            pos = frag['start'] - i
+            if pos < 0: break
+            if pos in ssbs: ssbs.remove(pos)
+            base = COMPLEMENT[template_strand[pos]]
+            RNA_strand[pos] = 'U' if base == 'T' else base
+            save_frame("DNA Primase", "P", pos, "DNA Primase laying down RNA Primer bases (U).")
 
-    # --- PHASE 5: POL I MATURATION ---
-    plans = [{"id": '1', "start": frag1_start, "len": frag1_primer_len}, {"id": '2', "start": frag2_start, "len": frag2_primer_len}]
-    for p in plans:
-        save_frame("DNA Polymerase I", "1", p['start'], f"DNA Pol I binding to remove RNA primer on Fragment {p['id']}.")
-        for i in range(p['len']):
-            pos = p['start'] - i
-            rna_b = RNA_strand[pos]
-            if rna_b == " ": continue
-            RNA_strand[pos] = " "
-            DNA_strand[pos] = 'T' if rna_b == 'U' else rna_b
-            save_frame("DNA Polymerase I", "1", pos, "DNA Pol I replacing RNA primer nucleotide with DNA base.")
+        # DNA Polymerase III Entry
+        pol3_start = frag['start'] - frag['primer_len']
+        if pol3_start >= frag['limit']:
+            save_frame("DNA Polymerase III", "3", pol3_start, "DNA Polymerase III docking onto the 3' OH end of the primer.")
+        
+        # Elongation Phase
+        curr_pos = pol3_start
+        while curr_pos >= frag['limit']:
+            if curr_pos in ssbs: ssbs.remove(curr_pos)
+            DNA_strand[curr_pos] = COMPLEMENT[template_strand[curr_pos]]
+            save_frame("DNA Polymerase III", "3", curr_pos, f"DNA Pol III extending {frag['name']} with DNA bases.")
+            curr_pos -= 1
 
-    # --- PHASE 6: LIGASE BACKBONE SEAL ---
+        save_frame("None", " ", None, f"{frag['name']} synthesis step complete. Notice structural breaks (nicks).")
+
+    # --- PHASE 2: DNA POLYMERASE I MATURATION ---
+    for frag in fragments_plan:
+        if frag['start'] < 0: continue
+        save_frame("DNA Polymerase I", "1", frag['start'], f"DNA Polymerase I targeting RNA primer on {frag['name']}.")
+        
+        for i in range(frag['primer_len']):
+            pos = frag['start'] - i
+            if pos < 0: break
+            rna_base = RNA_strand[pos]
+            if rna_base == " ": continue
+            RNA_strand[pos] = " "  # Excise RNA
+            DNA_strand[pos] = 'T' if rna_base == 'U' else rna_base # Replace with DNA
+            save_frame("DNA Polymerase I", "1", pos, "DNA Pol I replacing RNA primer base with DNA.")
+
+    # --- PHASE 3: DNA LIGASE BOND REPAIR ---
+    # The nick position sits precisely at the boundary separating the fragments
     if length > 3:
-        nick_pos = midpoint
-        save_frame("DNA Ligase", "L", nick_pos, "DNA Ligase targeting structural nick between Fragment 2 and Fragment 1.")
+        nick_position = midpoint
+        save_frame("DNA Ligase", "L", nick_position, "DNA Ligase scanning for structural nicks in the sugar-phosphate backbone...")
+        
         sealed_nick = True
-        energy["ATP"] += 2  
-        save_frame("DNA Ligase", "L", nick_pos, "DNA Ligase consumed ATP. Phosphodiester backbone completed! Nick sealed.")
+        save_frame("DNA Ligase", "L", nick_position, "DNA Ligase catalyzes phosphodiester bond formation! Nick sealed (⦙ removed).")
 
-    save_frame("None", " ", None, "Replication process finalized successfully.")
+    # Final wrap frame
+    save_frame("None", " ", None, "Ligation complete! The lagging strand is now a single, continuous covalent molecule.")
+    
     return frames, midpoint
 
 @app.route('/')
@@ -163,15 +116,17 @@ def index():
 
 @app.route('/run_simulation', methods=['POST'])
 def run_simulation():
+    # Read user input
     user_input = request.json.get('template', '').upper().strip()
-    mutate_opt = request.json.get('mutate', True)
     
+    # Validation check: Ensure the sequence only contains proper DNA bases
     if not user_input or not re.match("^[ATCG]+$", user_input):
-        return jsonify({"error": "Invalid sequence. Enter character strings containing only A, T, C, and G."}), 400
-    if len(user_input) < 12 or len(user_input) > 50:
-        return jsonify({"error": "Please enter a DNA template between 12 and 50 base pairs for layout sizing."}), 400
+        return jsonify({"error": "Invalid sequence. Please enter character strings containing only A, T, C, and G."}), 400
+        
+    if len(user_input) < 10 or len(user_input) > 50:
+        return jsonify({"error": "For optimal visual presentation, please input a sequence between 10 and 50 bases long."}), 400
 
-    frames, nick_idx = generate_full_simulation(user_input, mutate_opt)
+    frames, nick_idx = generate_simulation_frames(user_input)
     return jsonify({"frames": frames, "nick_index": nick_idx})
 
 if __name__ == '__main__':

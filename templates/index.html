@@ -2,74 +2,124 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Advanced DNA Replication Simulator</title>
+    <title>Interactive DNA Replication Dashboard</title>
     <style>
-        body { font-family: 'Courier New', Courier, monospace; background-color: #1a1a1a; color: #cfcfcf; padding: 25px; }
-        .container { max-width: 1100px; margin: auto; background-color: #242424; padding: 25px; border-radius: 6px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
-        h2 { color: #4ec9b0; margin-top: 0; border-bottom: 1px solid #3a3a3a; padding-bottom: 10px; }
-        .input-panel { background-color: #2e2e2e; padding: 15px; border-radius: 4px; margin-bottom: 15px; border-left: 4px solid #4ec9b0; display: flex; flex-wrap: wrap; gap: 15px; align-items: center; }
-        input[type="text"] { flex-grow: 1; min-width: 300px; padding: 8px; background-color: #1e1e1e; color: #fff; border: 1px solid #444; border-radius: 4px; font-family: inherit; font-size: 14px; text-transform: uppercase; }
-        .metrics-bar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 15px; }
-        .metric-card { background-color: #1e1e1e; padding: 10px; border-radius: 4px; border: 1px solid #333; text-align: center; }
-        .metric-card span { display: block; font-size: 18px; font-weight: bold; color: #ce9178; }
-        .controls { margin: 15px 0; display: flex; align-items: center; gap: 10px; }
-        button { font-family: inherit; background-color: #0e639c; color: white; border: none; padding: 10px 16px; cursor: pointer; border-radius: 4px; font-size: 14px; }
+        body {
+            font-family: 'Courier New', Courier, monospace;
+            background-color: #1e1e1e;
+            color: #d4d4d4;
+            padding: 30px;
+        }
+        .container {
+            max-width: 1000px;
+            margin: auto;
+            background-color: #252526;
+            padding: 25px;
+            border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+        }
+        h2 {
+            color: #569cd6;
+            margin-top: 0;
+            border-bottom: 1px solid #3c3c3c;
+            padding-bottom: 10px;
+        }
+        .input-panel {
+            background-color: #2d2d2d;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            border-left: 4px solid #569cd6;
+        }
+        .input-panel label {
+            font-weight: bold;
+            display: block;
+            margin-bottom: 5px;
+        }
+        input[type="text"] {
+            width: 70%;
+            padding: 8px;
+            background-color: #3c3c3c;
+            color: #fff;
+            border: 1px solid #555;
+            border-radius: 4px;
+            font-family: inherit;
+            font-size: 14px;
+            text-transform: uppercase;
+        }
+        .controls {
+            margin: 20px 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        button {
+            font-family: inherit;
+            background-color: #0e639c;
+            color: white;
+            border: none;
+            padding: 10px 18px;
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 14px;
+        }
         button:hover { background-color: #1177bb; }
-        button:disabled { background-color: #333; color: #666; cursor: not-allowed; }
-        .btn-secondary { background-color: #444; }
-        .btn-secondary:hover { background-color: #555; }
-        .terminal-display { background-color: #000; padding: 20px; border-radius: 4px; white-space: pre; line-height: 1.5; font-size: 15px; overflow-x: auto; border: 1px solid #2d2d2d; min-height: 300px; }
-        .legend { margin-top: 15px; font-size: 13px; color: #888; background-color: #2a2a2a; padding: 12px; border-radius: 4px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        .error-msg { color: #f44747; width: 100%; font-weight: bold; margin-top: 5px; }
+        button:disabled { background-color: #3c3c3c; color: #777; cursor: not-allowed; }
+        .btn-secondary { background-color: #4d4d4d; }
+        .btn-secondary:hover { background-color: #616161; }
+        .error-msg {
+            color: #f44747;
+            margin-top: 10px;
+            font-weight: bold;
+        }
+        .terminal-display {
+            background-color: #000;
+            padding: 20px;
+            border-radius: 4px;
+            white-space: pre;
+            line-height: 1.5;
+            font-size: 16px;
+            overflow-x: auto;
+            border: 1px solid #333;
+            min-height: 220px;
+        }
+        .legend {
+            margin-top: 20px;
+            font-size: 13px;
+            color: #858585;
+            background-color: #2d2d2d;
+            padding: 12px;
+            border-radius: 4px;
+        }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2>Replication Fork Engine Dashboard</h2>
+    <h2>Lagging Strand Replication Engine</h2>
     
     <div class="input-panel">
-        <div style="flex-grow: 1;">
-            <label style="font-weight:bold; display:block; margin-bottom:5px;">Template Sequence (3' &rarr; 5'):</label>
-            <input type="text" id="dna-sequence" value="TACGGCATTTACGCAACTGATTACAGTCATGCAT">
-        </div>
-        <div>
-            <label style="display:block; margin-bottom:5px;"><input type="checkbox" id="trigger-mutation" checked> Enable Pol III Mutation Loop</label>
-            <button onclick="loadSimulation()">Load & Process Matrix</button>
-        </div>
+        <label for="dna-sequence">Enter Template Strand (3' &rarr; 5'):</label>
+        <input type="text" id="dna-sequence" value="TACGGCATTTACGCAACTGATTACAGTCATGCAT" placeholder="e.g., ATCGATCGATCG">
+        <button onclick="loadNewSimulation()">Load Sequence</button>
         <div id="error-box" class="error-msg"></div>
-    </div>
-
-    <div class="metrics-bar">
-        <div class="metric-card">ATP Consumed (Helicase/Ligase) <span id="m-atp">0</span></div>
-        <div class="metric-card">GTP Consumed (Primase Anchors) <span id="m-gtp">0</span></div>
-        <div class="metric-card">dNTPs Incorporated <span id="m-dntp">0</span></div>
-        <div class="metric-card">Active Status <span id="m-status" style="color:#569cd6; font-size:14px;">Idle</span></div>
     </div>
     
     <div class="controls">
-        <button id="play-btn" onclick="togglePlay()" disabled>Play Simulation</button>
+        <button id="play-btn" onclick="togglePlay()" disabled>Play</button>
         <button id="step-back-btn" class="btn-secondary" onclick="stepFrame(-1)" disabled>&larr; Step Back</button>
         <button id="step-fwd-btn" class="btn-secondary" onclick="stepFrame(1)" disabled>Step Forward &rarr;</button>
         <button id="reset-btn" class="btn-secondary" onclick="resetPlayback()" disabled>Restart</button>
-        <span id="frame-counter" style="color: #888; margin-left: 10px;"></span>
+        <span id="frame-counter" style="color: #858585; margin-left: 10px;"></span>
     </div>
 
-    <div id="display-box" class="terminal-display">Configure your DNA input strand value, then hit "Load & Process Matrix".</div>
+    <div id="display-box" class="terminal-display">Enter or verify a sequence above, then click "Load Sequence".</div>
 
     <div class="legend">
-        <div>
-            <strong>Structural Symbols:</strong><br>
-            Double Helix Bonded: <span style="color:#569cd6;">= = =</span><br>
-            Unzipped Single Base Template: <span style="color:#fff; background-color:#333; padding: 0 2px;">X</span><br>
-            [S] SSB Protein Insulation Layer
-        </div>
-        <div>
-            <strong>Enzymatic Markers:</strong><br>
-            [H] DNA Helicase | [P] DNA Primase | [3] DNA Pol III<br>
-            [E] Exonuclease Proofreader | [1] DNA Pol I<br>
-            [L] DNA Ligase | <span style="color:#f44747; font-weight:bold;">[⦙]</span> Sugar-Phosphate Nick
-        </div>
+        <strong>Visual Key:</strong><br>
+        [S] SSB Protein (Protects Single Strands) | [U] Uracil (RNA Primer element)<br>
+        [P] DNA Primase | [3] DNA Polymerase III | [1] DNA Polymerase I | [L] DNA Ligase<br>
+        <span style="color: #f44747; font-weight: bold;">[⦙]</span> Structural Nick (Unbonded gap between fragments)
     </div>
 </div>
 
@@ -78,109 +128,134 @@ let frames = [];
 let nickIndex = 0;
 let currentFrameIndex = 0;
 let isPlaying = false;
-let timer = null;
+let animationTimer = null;
 
-const pairChecks = {'A':'T','T':'A','C':'G','G':'C','U':'A'};
-
-async function loadSimulation() {
-    const seq = document.getElementById("dna-sequence").value;
-    const mut = document.getElementById("trigger-mutation").checked;
+async function loadNewSimulation() {
+    const sequenceInput = document.getElementById("dna-sequence").value;
     document.getElementById("error-box").innerText = "";
+    
+    // Stop any running animations
     if(isPlaying) togglePlay();
 
     try {
-        const res = await fetch('/run_simulation', {
+        const response = await fetch('/run_simulation', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ template: seq, mutate: mut })
+            body: JSON.stringify({ template: sequenceInput })
         });
-        const data = await res.json();
-        if (!res.ok) { document.getElementById("error-box").innerText = data.error; return; }
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+            document.getElementById("error-box").innerText = data.error;
+            return;
+        }
         
         frames = data.frames;
         nickIndex = data.nick_index;
         currentFrameIndex = 0;
         
+        // Enable interaction controls
         document.getElementById("play-btn").disabled = false;
         document.getElementById("step-back-btn").disabled = false;
         document.getElementById("step-fwd-btn").disabled = false;
         document.getElementById("reset-btn").disabled = false;
+        
         renderFrame(currentFrameIndex);
-    } catch(e) { document.getElementById("error-box").innerText = "Connection error."; }
+    } catch (error) {
+        document.getElementById("error-box").innerText = "Server connection lost.";
+    }
 }
 
 function togglePlay() {
-    const btn = document.getElementById("play-btn");
-    if(isPlaying) {
-        clearInterval(timer); btn.innerText = "Play Simulation"; isPlaying = false;
+    const playBtn = document.getElementById("play-btn");
+    if (isPlaying) {
+        clearInterval(animationTimer);
+        playBtn.innerText = "Play";
+        isPlaying = false;
     } else {
-        if(currentFrameIndex >= frames.length - 1) currentFrameIndex = 0;
-        btn.innerText = "Pause"; isPlaying = true;
-        timer = setInterval(() => {
-            if(currentFrameIndex < frames.length - 1) { currentFrameIndex++; renderFrame(currentFrameIndex); }
-            else { togglePlay(); }
-        }, 600);
+        if (currentFrameIndex >= frames.length - 1) currentFrameIndex = 0; 
+        playBtn.innerText = "Pause";
+        isPlaying = true;
+        animationTimer = setInterval(() => {
+            if (currentFrameIndex < frames.length - 1) {
+                currentFrameIndex++;
+                renderFrame(currentFrameIndex);
+            } else {
+                togglePlay(); // Auto-pause when reaching the end frame
+            }
+        }, 500);
     }
 }
 
-function stepFrame(dir) { if(isPlaying) togglePlay(); let target = currentFrameIndex + dir; if(target>=0 && target<frames.length) { currentFrameIndex = target; renderFrame(currentFrameIndex); } }
-function resetPlayback() { if(isPlaying) togglePlay(); currentFrameIndex = 0; renderFrame(currentFrameIndex); }
-
-function renderFrame(idx) {
-    if(!frames || frames.length === 0) return;
-    const frame = frames[idx];
-
-    let templateDisplay = "";
-    for(let i=0; i<frame.template.length; i++) {
-        if(frame.unzipped[i]) templateDisplay += `<span style="color:#html; background-color:#333; font-weight:bold; padding: 0 1px;">${frame.template[i]}</span>`;
-        else templateDisplay += `<span style="color:#569cd6;">${frame.template[i]}</span>`;
+function stepFrame(direction) {
+    if (isPlaying) togglePlay(); // Pause automation if active
+    let targetIndex = currentFrameIndex + direction;
+    if (targetIndex >= 0 && targetIndex < frames.length) {
+        currentFrameIndex = targetIndex;
+        renderFrame(currentFrameIndex);
     }
+}
 
-    let bondDisplay = frame.unzipped.map(u => u ? "." : "=").join(" ");
+function resetPlayback() {
+    if (isPlaying) togglePlay();
+    currentFrameIndex = 0;
+    renderFrame(currentFrameIndex);
+}
 
-    // Build alignment rows strictly mapping character index matches directly
-    let laggingDisplay = "";
-    let validRow = "";
+function renderFrame(index) {
+    if (!frames || frames.length === 0) return;
+    const frame = frames[index];
     
-    for(let i=0; i<frame.template.length; i++) {
-        // Render structural nicks visually without truncating surrounding indices
-        if (i === nickIndex && frame.dna.some(b => b !== " ") && !frame.sealed_nick) {
-            laggingDisplay += `<span style="color:#f44747; font-weight:bold;">⦙</span>`;
-        } else if(frame.rna[i] !== " ") {
-            laggingDisplay += `<span style="color:#ce9178;">${frame.rna[i]}</span>`;
-        } else if(frame.dna[i] !== " ") {
-            laggingDisplay += `<span style="color:#4ec9b0;">${frame.dna[i]}</span>`;
+    // Build the template tracking scale
+    let laggingBuild = "";
+    for (let i = 0; i < frame.template.length; i++) {
+        if (frame.rna[i] !== " ") {
+            laggingBuild += `<span style="color: #ce9178;">${frame.rna[i]}</span>`;
+        } else if (frame.dna[i] !== " ") {
+            laggingBuild += `<span style="color: #4ec9b0;">${frame.dna[i]}</span>`;
         } else {
-            laggingDisplay += " ";
-        }
-
-        let activeB = frame.rna[i] !== " " ? frame.rna[i] : frame.dna[i];
-        if(activeB !== " ") {
-            if(pairChecks[activeB] === frame.template[i]) validRow += `<span style="color:#a6e22e;">✔</span>`;
-            else validRow += `<span style="color:#f44747; font-weight:bold;">✘</span>`;
-        } else {
-            validRow += " ";
+            laggingBuild += " ";
         }
     }
 
-    let ssbStr = frame.ssbs.map(s => s === "S" ? `<span style="color:#b5cea8;">S</span>` : " ").join("");
-    let okazakiStr = frame.okazaki.map(o => o==='1' ? `<span style="color:#e5c07b;">1</span>` : (o==='2' ? `<span style="color:#c678dd;">2</span>` : " ")).join("");
-    
-    let enzArr = Array(frame.template.length).fill(" ");
-    if(frame.enzyme.pos !== null) enzArr[frame.enzyme.pos] = `<span style="color:#fff; background-color:#0e639c; font-weight:bold; padding:0 2px;">${frame.enzyme.marker}</span>`;
-    
-    const w = Math.max(75, frame.template.length + 22);
-    
-    let html = "=".repeat(w) + "\n   DYNAMIC REPLICATION FORK SYSTEM\n" + "=".repeat(w) + "\n";
-    html += `Template (3'->5'):  ${templateDisplay}\n`;
-    html += `Bonds:              ${bondDisplay}\n`;
-    html += `SSB Insulation:     ${ssbStr}\n`;
-    html += `Lagging (5'->3'):   ${laggingDisplay}\n`;
-    html += `Validation Matrix:  ${validRow}\n`;
-    html += `Okazaki Track:      ${okazakiStr}\n`;
-    html += `Enzyme Component:   ${enzArr.join("")}  <-- <span style="color:#dcdcaa;">${frame.enzyme.name}</span>\n`;
-    html += "-".repeat(w) + `\nStatus Text: <span style="color:#9cdcfe;">${frame.status}</span>\n` + "=".repeat(w);
+    // Insert structural nick gap notation (⦙) at the boundary index if unligated
+    if (frame.dna.some(b => b !== " ") && !frame.sealed_nick) {
+        let textArr = laggingBuild.match(/(<span[^>]*>.*?<\/span>| )/g) || [];
+        if(textArr[nickIndex]) {
+            textArr[nickIndex] = `<span style="color: #f44747; font-weight: bold;">⦙</span>`;
+            laggingBuild = textArr.join("");
+        }
+    }
 
-    document.getElementById("display-box").innerHTML = html;
-    document.getElementById("frame-counter").innerText = `Step: ${idx+1} / ${frames.length}`;
-    
+    let ssbStr = frame.ssbs.map(s => s === "S" ? `<span style="color: #b5cea8;">S</span>` : " ").join("");
+
+    let enzymeStr = Array(frame.template.length).fill(" ");
+    if (frame.enzyme.pos !== null) {
+        enzymeStr[frame.enzyme.pos] = `<span style="color: #ffffff; background-color: #0e639c; font-weight:bold; padding: 0 2px;">${frame.enzyme.marker}</span>`;
+    }
+    let trackingRow = enzymeStr.join("");
+
+    // Calculate dynamic separation spacing matching length boundaries
+    const spacer = "=".repeat(Math.max(65, frame.template.length + 22));
+    const subSpacer = "-".repeat(Math.max(65, frame.template.length + 22));
+
+    let outputhtml = "";
+    outputhtml += `${spacer}\n`;
+    outputhtml += "      DYNAMIC REPLICATION FORK ANIMATION (LAGGING STRAND WEB VIEW)\n";
+    outputhtml += `${spacer}\n`;
+    outputhtml += `Template (3'->5'):  <span style="color: #569cd6;">${frame.template}</span>\n`;
+    outputhtml += `SSB Proteins:       ${ssbStr}\n`;
+    outputhtml += `Lagging (5'->3'):   ${laggingBuild}\n`;
+    outputhtml += `Enzyme Tracker:     ${trackingRow}  <-- <span style="color: #dcdcaa;">${frame.enzyme.name}</span>\n`;
+    outputhtml += `${subSpacer}\n`;
+    outputhtml += `Status: <span style="color: #9cdcfe;">${frame.status}</span>\n`;
+    outputhtml += `${spacer}`;
+
+    document.getElementById("display-box").innerHTML = outputhtml;
+    document.getElementById("frame-counter").innerText = `Frame: ${index + 1} / ${frames.length}`;
+}
+</script>
+
+</body>
+</html>
